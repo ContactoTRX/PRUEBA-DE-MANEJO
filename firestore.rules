@@ -1,0 +1,132 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidEvaluationItem(item) {
+      return item is map &&
+        item.keys().hasAll(['id', 'title', 'section', 'points', 'result']) &&
+        item.keys().hasOnly(['id', 'title', 'section', 'points', 'result']) &&
+        item.id is string && item.id.size() >= 1 && item.id.size() <= 64 &&
+        item.title is string && item.title.size() >= 1 && item.title.size() <= 160 &&
+        item.section is string && item.section.size() >= 1 && item.section.size() <= 80 &&
+        item.points is number && item.points > 0 && item.points <= 100 &&
+        item.result in ['correct', 'incorrect'];
+    }
+
+    function isValidEvaluation(data) {
+      return data.keys().hasAll([
+          'evaluatorId',
+          'evaluatorName',
+          'candidateName',
+          'candidateDocument',
+          'licenseCategory',
+          'vehiclePlate',
+          'totalPoints',
+          'earnedPoints',
+          'percentage',
+          'passed',
+          'notes',
+          'items',
+          'createdAt'
+        ]) &&
+        data.keys().hasOnly([
+          'evaluatorId',
+          'evaluatorName',
+          'candidateName',
+          'candidateDocument',
+          'licenseCategory',
+          'vehiclePlate',
+          'totalPoints',
+          'earnedPoints',
+          'percentage',
+          'passed',
+          'notes',
+          'items',
+          'createdAt'
+        ]) &&
+        data.evaluatorId is string &&
+        isValidId(data.evaluatorId) &&
+        data.evaluatorId == request.auth.uid &&
+        data.evaluatorName is string && data.evaluatorName.size() >= 1 && data.evaluatorName.size() <= 120 &&
+        data.candidateName is string && data.candidateName.size() >= 2 && data.candidateName.size() <= 120 &&
+        data.candidateDocument is string && data.candidateDocument.size() >= 2 && data.candidateDocument.size() <= 40 &&
+        data.licenseCategory is string && data.licenseCategory in ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] &&
+        data.vehiclePlate is string && data.vehiclePlate.size() <= 20 &&
+        data.totalPoints is number && data.totalPoints > 0 && data.totalPoints <= 1000 &&
+        data.earnedPoints is number && data.earnedPoints >= 0 && data.earnedPoints <= data.totalPoints &&
+        data.percentage is number && data.percentage >= 0 && data.percentage <= 100 &&
+        data.percentage >= (data.earnedPoints * 100.0 / data.totalPoints) - 0.15 &&
+        data.percentage <= (data.earnedPoints * 100.0 / data.totalPoints) + 0.15 &&
+        data.passed is bool &&
+        data.passed == (data.percentage >= 70) &&
+        data.notes is string && data.notes.size() <= 1000 &&
+        data.items is list && data.items.size() >= 1 && data.items.size() <= 35 &&
+        isValidEvaluationItem(data.items[0]) &&
+        data.createdAt == request.time;
+    }
+
+    function isValidRubricItem(item) {
+      return item is map &&
+        item.keys().hasAll(['id', 'title', 'section', 'points']) &&
+        item.keys().hasOnly(['id', 'title', 'section', 'points']) &&
+        item.id is string && item.id.size() >= 1 && item.id.size() <= 64 &&
+        item.title is string && item.title.size() >= 1 && item.title.size() <= 160 &&
+        item.section is string && item.section.size() >= 1 && item.section.size() <= 80 &&
+        item.points is number && item.points > 0 && item.points <= 100;
+    }
+
+    function isValidRubric(data) {
+      return data.keys().hasAll(['ownerId', 'items', 'updatedAt']) &&
+        data.keys().hasOnly(['ownerId', 'items', 'updatedAt']) &&
+        data.ownerId is string &&
+        isValidId(data.ownerId) &&
+        data.ownerId == request.auth.uid &&
+        data.items is list && data.items.size() >= 1 && data.items.size() <= 35 &&
+        isValidRubricItem(data.items[0]) &&
+        data.updatedAt == request.time;
+    }
+
+    match /evaluations/{evaluationId} {
+      allow get: if isVerifiedUser() && isValidId(evaluationId) && existing().evaluatorId == request.auth.uid;
+      allow list: if isVerifiedUser() && resource.data.evaluatorId == request.auth.uid;
+      allow create: if isVerifiedUser() && isValidId(evaluationId) && isValidEvaluation(incoming());
+      allow update: if false;
+      allow delete: if isVerifiedUser() && isValidId(evaluationId) && existing().evaluatorId == request.auth.uid;
+    }
+
+    match /rubrics/{rubricId} {
+      allow get: if isVerifiedUser() && isValidId(rubricId) && rubricId == request.auth.uid;
+      allow list: if false;
+      allow create: if isVerifiedUser() && isValidId(rubricId) && rubricId == request.auth.uid && isValidRubric(incoming());
+      allow update: if isVerifiedUser() && isValidId(rubricId) && rubricId == request.auth.uid &&
+        isValidRubric(incoming()) &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['items', 'updatedAt']);
+      allow delete: if isVerifiedUser() && isValidId(rubricId) && rubricId == request.auth.uid;
+    }
+  }
+}

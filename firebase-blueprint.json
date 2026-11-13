@@ -1,0 +1,126 @@
+{
+  "entities": {
+    "DrivingEvaluation": {
+      "title": "DrivingEvaluation",
+      "description": "Registro completo de una prueba práctica de manejo evaluada por un instructor.",
+      "type": "object",
+      "properties": {
+        "evaluatorId": {
+          "type": "string",
+          "description": "UID del evaluador autenticado.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "evaluatorName": {
+          "type": "string",
+          "description": "Nombre del instructor o evaluador.",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "candidateName": {
+          "type": "string",
+          "description": "Nombre completo del aspirante evaluado.",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "candidateDocument": {
+          "type": "string",
+          "description": "Documento de identidad o folio del aspirante.",
+          "minLength": 2,
+          "maxLength": 40
+        },
+        "licenseCategory": {
+          "type": "string",
+          "description": "Categoría de licencia evaluada.",
+          "enum": ["A1", "A2", "B1", "B2", "C1", "C2"],
+          "maxLength": 10
+        },
+        "vehiclePlate": {
+          "type": "string",
+          "description": "Placa o identificador del vehículo de prueba.",
+          "maxLength": 20
+        },
+        "totalPoints": {
+          "type": "number",
+          "description": "Sumatoria máxima posible de puntos de la rúbrica."
+        },
+        "earnedPoints": {
+          "type": "number",
+          "description": "Sumatoria de puntos obtenidos por respuestas correctas."
+        },
+        "percentage": {
+          "type": "number",
+          "description": "Porcentaje final obtenido (0 a 100)."
+        },
+        "passed": {
+          "type": "boolean",
+          "description": "Resultado aprobatorio cuando el porcentaje es igual o superior al 70%."
+        },
+        "notes": {
+          "type": "string",
+          "description": "Observaciones generales del evaluador.",
+          "maxLength": 1000
+        },
+        "items": {
+          "type": "array",
+          "description": "Lista acotada de criterios evaluados como correcto o incorrecto (máximo 35)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Marca de tiempo del servidor al guardar la prueba."
+        }
+      },
+      "required": [
+        "evaluatorId",
+        "evaluatorName",
+        "candidateName",
+        "candidateDocument",
+        "licenseCategory",
+        "vehiclePlate",
+        "totalPoints",
+        "earnedPoints",
+        "percentage",
+        "passed",
+        "notes",
+        "items",
+        "createdAt"
+      ]
+    },
+    "CustomRubric": {
+      "title": "CustomRubric",
+      "description": "Plantilla personalizada de criterios y puntajes del evaluador.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "description": "UID del evaluador propietario de la plantilla.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "items": {
+          "type": "array",
+          "description": "Lista acotada de criterios configurados (máximo 35)."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Marca de tiempo del servidor de la última actualización."
+        }
+      },
+      "required": ["ownerId", "items", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/evaluations/{evaluationId}": {
+      "schema": { "$ref": "#/entities/DrivingEvaluation" },
+      "description": "Evaluaciones prácticas de manejo guardadas por cada evaluador."
+    },
+    "/rubrics/{rubricId}": {
+      "schema": { "$ref": "#/entities/CustomRubric" },
+      "description": "Plantilla personalizada de criterios por evaluador (rubricId == uid)."
+    }
+  }
+}
